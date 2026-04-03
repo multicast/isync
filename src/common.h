@@ -21,6 +21,10 @@
 #include <string.h>
 #include <time.h>
 
+#ifdef HAVE_MACOS_KEYCHAIN
+#include <CoreFoundation/CFString.h>
+#endif /* HAVE_MACOS_KEYCHAIN */
+
 typedef unsigned char uchar;
 typedef unsigned short ushort;
 typedef unsigned int uint;
@@ -298,6 +302,11 @@ int ATTR_PRINTFLIKE(2, 3) nfasprintf( char **str, const char *fmt, ... );
 int ATTR_PRINTFLIKE(3, 4) nfsnprintf( char *buf, int blen, const char *fmt, ... );
 void ATTR_NORETURN oob( void );
 void ATTR_NORETURN oom( void );
+
+#ifdef HAVE_MACOS_KEYCHAIN
+CFStringRef nfstrtocf( const char *str );
+char *nfcftostr( CFStringRef str );
+#endif /* HAVE_MACOS_KEYCHAIN */
 
 int map_name( const char *arg, int argl, char **result, uint reserve, const char *in, const char *out );
 

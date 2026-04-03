@@ -2361,9 +2361,14 @@ search_macos_keychain( const char *host, const char *user )
 			NULL );  // itemRef
 	if (ret != errSecSuccess) {
 		CFStringRef errmsg = SecCopyErrorMessageString( ret, NULL );
-		error( "Looking up Keychain failed: %s\n",
-		       CFStringGetCStringPtr( errmsg, kCFStringEncodingUTF8 ) );
-		CFRelease( errmsg );
+		if (errmsg) {
+			char *errstr = nfcftostr( errmsg );
+			error( "Looking up Keychain failed: %s\n", errstr );
+			free( errstr );
+			CFRelease( errmsg );
+		} else {
+			error( "Looking up Keychain failed: Unknown error\n" );
+		}
 		return NULL;
 	}
 

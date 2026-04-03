@@ -743,6 +743,38 @@ nfasprintf( char **str, const char *fmt, ... )
 	return ret;
 }
 
+#ifdef HAVE_MACOS_KEYCHAIN
+/*
+ * Basically just nfstrdup() but the new string can be used with Apple's Core
+ * Foundation framework.  The given str must be non-NULL and UTF-8 encoded.  The
+ * caller retains ownership of the returned reference.
+ */
+CFStringRef
+nfstrtocf( const char *str )
+{
+	CFStringRef ret = CFStringCreateWithCString(
+		kCFAllocatorDefault, str, kCFStringEncodingUTF8 );
+	if (!ret)
+		oom();
+	return ret;
+}
+
+/*
+ * Reverse of nfstrtocf; duplicates a Core Foundation string object as a C
+ * string encoded with UTF-8.  The given str must be non-NULL.  The caller
+ * retains ownership of the returned string.
+ */
+char *
+nfcftostr( CFStringRef str )
+{
+	CFIndex len = CFStringGetLength( str ); // Length in UTF-16
+	size_t max_size = len * sizeof(UInt16) + sizeof(char);
+	char *ret = nfmalloc( max_size );
+	CFStringGetCString( str, ret, max_size, kCFStringEncodingUTF8 );
+	return ret;
+}
+#endif /* HAVE_MACOS_KEYCHAIN */
+
 /*
 static struct passwd *
 cur_user( void )
