@@ -2332,6 +2332,47 @@ ensure_user( imap_server_conf_t *srvc )
 	return srvc->user;
 }
 
+#ifdef HAVE_MACOS_KEYCHAIN
+/*
+ * Searches the macOS file-based keychain for an appropriate password.  If
+ * found, returns a newly allocated copy of the password (which should later be
+ * freed).  Otherwise, returns NULL.
+ *
+ * A password is deemed appropriate if its protocol is IMAP, and its server name
+ * and account name match the given host and user, respectively.  If multiple
+ * such passwords exist, the first found by the Security framework is returned.
+ */
+static char *
+search_macos_keychain( const char *host, const char *user )
+{
+	void *password_data;
+	UInt32 password_length;
+
+	OSStatus ret = SecKeychainFindInternetPassword(
+			NULL,  // keychainOrArray
+			strlen( host ), host,
+			0, NULL,  // securityDomain
+			strlen( user ), user,
+			0, NULL,  // path
+			0,  // port - we could use it, but it seems pointless
+			kSecProtocolTypeIMAP,
+			kSecAuthenticationTypeDefault,
+			&password_length, &password_data,
+			NULL );  // itemRef
+	if (ret != errSecSuccess) {
+		CFStringRef errmsg = SecCopyErrorMessageString( ret, NULL );
+		error( "Looking up Keychain failed: %s\n",
+		       CFStringGetCStringPtr( errmsg, kCFStringEncodingUTF8 ) );
+		CFRelease( errmsg );
+		return NULL;
+	}
+
+	char *password_copy = nfstrndup( password_data, password_length );
+	SecKeychainItemFreeContent( NULL, password_data );
+	return password_copy;
+}
+#endif /* HAVE_MACOS_KEYCHAIN */
+
 static const char *
 ensure_password( imap_server_conf_t *srvc )
 {
@@ -2340,28 +2381,7 @@ ensure_password( imap_server_conf_t *srvc )
 			srvc->pass = cred_from_cmd( "PassCmd", srvc->pass_cmd, srvc->name );
 #ifdef HAVE_MACOS_KEYCHAIN
 		} else if (srvc->use_keychain) {
-			void *password_data;
-			UInt32 password_length;
-			OSStatus ret = SecKeychainFindInternetPassword(
-					NULL,  // keychainOrArray
-					strlen( srvc->sconf.host ), srvc->sconf.host,
-					0, NULL,  // securityDomain
-					strlen( srvc->user ), srvc->user,
-					0, NULL,  // path
-					0,  // port - we could use it, but it seems pointless
-					kSecProtocolTypeIMAP,
-					kSecAuthenticationTypeDefault,
-					&password_length, &password_data,
-					NULL );  // itemRef
-			if (ret != errSecSuccess) {
-				CFStringRef errmsg = SecCopyErrorMessageString( ret, NULL );
-				error( "Looking up Keychain failed: %s\n",
-				       CFStringGetCStringPtr( errmsg, kCFStringEncodingUTF8 ) );
-				CFRelease( errmsg );
-				return NULL;
-			}
-			srvc->pass = nfstrndup( password_data, password_length );
-			SecKeychainItemFreeContent( NULL, password_data );
+			srvc->pass = search_macos_keychain( srvc->sconf.host, srvc->user );
 #endif /* HAVE_MACOS_KEYCHAIN */
 		} else {
 			flushn();
