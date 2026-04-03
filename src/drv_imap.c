@@ -2334,6 +2334,62 @@ ensure_user( imap_server_conf_t *srvc )
 
 #ifdef HAVE_MACOS_KEYCHAIN
 /*
+ * Queries the macOS keychain for items matching the paramters specified by the
+ * given keys and vals.  If matches exist, returns the corresponding reference.
+ * Otherwise, returns NULL.
+ *
+ * The query paramters are a dictionary whose key-value pairs are specified by
+ * each pair of values located at the same index in the given keys and vals
+ * arrays.  So key 'keys[0]' has value 'vals[0]', key 'keys[1]' has value
+ * 'vals[1]', etc., up until key 'keys[size - 1]' and value 'vals[size - 1]'.
+ *
+ * The given size must be nonnegative and no more than the length of keys or
+ * vals.  Both keys and vals must be non-NULL if size is positive.
+ */
+static CFTypeRef
+query_macos_keychain( CFTypeRef *keys, CFTypeRef *vals, CFIndex size )
+{
+	assert( size >= 0 );
+
+	CFDictionaryRef query = CFDictionaryCreate(
+			kCFAllocatorDefault,
+			keys,
+			vals,
+			size,
+			&kCFTypeDictionaryKeyCallBacks,
+			&kCFTypeDictionaryValueCallBacks );
+	if (!query) {
+		error( "Looking up Keychain failed: Query creation failed\n" );
+		return NULL;
+	}
+
+	CFTypeRef item;
+	OSStatus ret = SecItemCopyMatching( query, &item );
+	CFRelease( query );
+	if (ret == errSecSuccess)
+		return item;
+	if (ret == errSecItemNotFound) {
+		// Ask user to add password to keychain if not found
+		error(
+			"Looking up Keychain failed: "
+			"Please add your password to the macOS keychain; "
+			"instructions can be found in the mbsync man page.\n" );
+	} else {
+		// Error is not because of user
+		CFStringRef errmsg = SecCopyErrorMessageString( ret, NULL );
+		if (errmsg) {
+			char *errstr = nfcftostr( errmsg );
+			error( "Looking up Keychain failed: %s\n", errstr );
+			free( errstr );
+			CFRelease( errmsg );
+		} else {
+			error( "Looking up Keychain failed: Unknown error\n" );
+		}
+	}
+	return NULL;
+}
+
+/*
  * Searches the macOS file-based keychain for an appropriate password.  If
  * found, returns a newly allocated copy of the password (which should later be
  * freed).  Otherwise, returns NULL.
@@ -2345,35 +2401,42 @@ ensure_user( imap_server_conf_t *srvc )
 static char *
 search_macos_keychain( const char *host, const char *user )
 {
-	void *password_data;
-	UInt32 password_length;
+	CFStringRef account = nfstrtocf( user );
+	CFStringRef protocol = nfstrtocf( "imap" ); // Also "imps" for IMAPS
+	CFStringRef server = nfstrtocf( host );
 
-	OSStatus ret = SecKeychainFindInternetPassword(
-			NULL,  // keychainOrArray
-			strlen( host ), host,
-			0, NULL,  // securityDomain
-			strlen( user ), user,
-			0, NULL,  // path
-			0,  // port - we could use it, but it seems pointless
-			kSecProtocolTypeIMAP,
-			kSecAuthenticationTypeDefault,
-			&password_length, &password_data,
-			NULL );  // itemRef
-	if (ret != errSecSuccess) {
-		CFStringRef errmsg = SecCopyErrorMessageString( ret, NULL );
-		if (errmsg) {
-			char *errstr = nfcftostr( errmsg );
-			error( "Looking up Keychain failed: %s\n", errstr );
-			free( errstr );
-			CFRelease( errmsg );
-		} else {
-			error( "Looking up Keychain failed: Unknown error\n" );
-		}
+	// Same index = key-value pair
+	CFTypeRef query_keys[] = {
+		kSecClass,
+		kSecAttrAccount,
+		// Also kSecAttrPort
+		kSecAttrProtocol,
+		kSecAttrServer,
+		kSecReturnData
+	};
+	CFTypeRef query_vals[] = {
+		kSecClassInternetPassword,
+		account,
+		protocol,
+		server,
+		kCFBooleanTrue
+	};
+
+	static_assert( as(query_keys), "empty query" );
+	static_assert( as(query_keys) == as(query_vals), "query size mismatch" );
+
+	CFDataRef password = query_macos_keychain(
+		query_keys, query_vals, as(query_keys) );
+	CFRelease( server );
+	CFRelease( protocol );
+	CFRelease( account );
+	if (!password)
 		return NULL;
-	}
 
+	const char *password_data = (const char *)CFDataGetBytePtr( password );
+	CFIndex password_length = CFDataGetLength( password );
 	char *password_copy = nfstrndup( password_data, password_length );
-	SecKeychainItemFreeContent( NULL, password_data );
+	CFRelease( password );
 	return password_copy;
 }
 #endif /* HAVE_MACOS_KEYCHAIN */
