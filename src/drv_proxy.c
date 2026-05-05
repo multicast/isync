@@ -454,5 +454,3 @@ proxy_alloc_store( store_t *real_ctx, const char *label, int force_async )
 //# EXCLUDE parse_store
 //# EXCLUDE cleanup
 //# EXCLUDE get_fail_state
-
-#include "drv_proxy.inc"

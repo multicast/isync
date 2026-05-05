@@ -4,11 +4,15 @@
 
 mbsync_SOURCES = \
 	util.c config.c socket.c \
-	driver.c drv_proxy.c \
+	driver.c \
 	drv_imap.c imap_msgs.c imap_utf7.c \
 	drv_maildir.c \
 	sync.c sync_state.c sync_msg_cvt.c \
 	main.c main_sync.c main_list.c
+EXTRA_mbsync_SOURCES = \
+	drv_proxy.c
+nodist_mbsync_SOURCES = \
+	drv_proxy_wrap.c
 noinst_HEADERS = \
 	common.h config.h socket.h \
 	driver.h imap_p.h \
@@ -16,9 +20,8 @@ noinst_HEADERS = \
 	main_p.h
 mbsync_LDADD = $(DB_LIBS) $(SSL_LIBS) $(SOCK_LIBS) $(SASL_LIBS) $(Z_LIBS) $(KEYCHAIN_LIBS)
 
-drv_proxy.$(OBJEXT): drv_proxy.inc
-drv_proxy.inc: $(srcdir)/driver.h $(srcdir)/drv_proxy.c $(srcdir)/drv_proxy_gen.pl
-	perl $(srcdir)/drv_proxy_gen.pl $(srcdir)/driver.h $(srcdir)/drv_proxy.c drv_proxy.inc
+drv_proxy_wrap.c: $(srcdir)/driver.h $(srcdir)/drv_proxy.c $(srcdir)/drv_proxy_gen.pl
+	perl $(srcdir)/drv_proxy_gen.pl $(srcdir)/driver.h $(srcdir)/drv_proxy.c drv_proxy_wrap.c
 
 mdconvert_SOURCES = mdconvert.c
 mdconvert_LDADD = $(DB_LIBS)
@@ -54,4 +57,4 @@ example_DATA = mbsyncrc.sample
 
 EXTRA_DIST = drv_proxy_gen.pl run-tests.pl $(example_DATA) $(in_man)
 
-CLEANFILES = drv_proxy.inc
+CLEANFILES = drv_proxy_wrap.c

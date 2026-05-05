@@ -1,4 +1,4 @@
-/drv_proxy.inc
+/drv_proxy_wrap.c
 /mbsync
 /mbsync.1
 /mdconvert

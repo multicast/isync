@@ -9,7 +9,7 @@
 use strict;
 use warnings;
 
-die("Usage: $0 driver.h drv_proxy.c drv_proxy.inc\n")
+die("Usage: $0 driver.h drv_proxy.c drv_proxy_wrap.c\n")
 	if ($#ARGV != 2);
 
 my ($in_header, $in_source, $out_source) = @ARGV;
@@ -116,6 +116,7 @@ sub indent($$)
 }
 
 open(my $outh, ">".$out_source) or die("Cannot create $out_source: $!\n");
+print $outh "#include \"".$in_source."\"\n\n";
 
 for (@ptypes) {
 	/^([\w* ]+)\(\*(\w+)\)\( (.*) \)$/ or die("Cannot parse prototype '$_'\n");
