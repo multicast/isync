@@ -77,8 +77,9 @@ Display version information.
 .TP
 \fB-y\fR, \fB--dry-run\fR
 Enter simulation mode: the Channel status is queried and all required
-operations are determined, but no modifications are actually made
-to either the mailboxes or the state files.
+operations are determined, but no synchronization is actually performed.
+Note that this does not imply completely read-only operation, as
+mailbox book-keeping is still performed.
 .TP
 \fB-e\fR, \fB--ext-exit\fR
 Return an extended exit code: Add 32 or 64 to the code if any
