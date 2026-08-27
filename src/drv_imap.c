@@ -2682,6 +2682,11 @@ imap_open_store_authenticate2( imap_store_t *ctx )
 	if (auth_login) {
 		if (!ensure_user( srvc ) || !ensure_password( srvc ))
 			goto bail;
+		// Strictly speaking, the limit is util.c:QPRINTF_BUFF / 2
+		if (strlen( srvc->user ) + strlen( srvc->pass ) > 200) {
+			error( "IMAP error: LOGIN credentials are excessively long. Wrong AuthMech selected?\n" );
+			goto bail;
+		}
 #ifdef HAVE_LIBSSL
 		if (!ctx->conn.ssl && !ctx->conn.conf->tunnel)
 #endif
